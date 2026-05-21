@@ -152,9 +152,3 @@ EstateFlow/
 ├── supabase/migrations/  # SQL schema + RLS
 └── README.md
 ```
-
-## Cursor tips
-
-- Use **Agent** with: “Wire tenant submit form to Supabase storage bucket maintenance-media”
-- Add `.cursor/rules/estateflow.mdc` with your architecture constraints
-- Enable **browser MCP** to test http://localhost:5173 after `npm run dev`
