@@ -1,0 +1,15 @@
+---
+description: EstateFlow architecture and coding standards
+alwaysApply: true
+---
+
+# EstateFlow
+
+- Stack: FastAPI + LangGraph + Supabase + React/Vite
+- No hardcoded business data; load from Supabase
+- Complaints via platform portal (not WhatsApp intake)
+- Maps: browser geolocation + haversine vendor match; OSM/Nominatim only (no Google Maps)
+- LLM: OpenRouter primary, Ollama optional fallback
+- Maintenance pipeline: security → complaint → priority → compliance → vendor_matching → governance → scheduling → communications → report_agent → performance_agent; predictive_maintenance_agent runs weekly async
+- Roles: tenant, manager, inspector, admin (profiles table)
+- Log all agent runs to agent_logs table
