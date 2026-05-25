@@ -13,3 +13,7 @@ langchain-openai==0.2.14
 openai==1.58.1
 reportlab==4.2.5
 pillow==11.0.0
+tzdata
+#google-api-python-client>=2.100.0
+#google-auth>=2.25.0
+#google-auth-oauthlib>=1.2.0

@@ -136,7 +136,9 @@ export function NotificationBell() {
                 const isUnread = !n.read_at;
                 const linkTo =
                   n.reference_type === 'maintenance_request' && n.reference_id
-                    ? `/requests/${n.reference_id}`
+                    ? `/requests/${n.reference_id}${
+                        n.subject === 'Appointment scheduled' ? '?rate=1' : ''
+                      }`
                     : null;
 
                 return (

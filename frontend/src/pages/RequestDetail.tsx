@@ -1,7 +1,7 @@
-import { useEffect, useState, FormEvent } from 'react';
+import { useEffect, useState, FormEvent, useRef } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import {
-  ArrowLeft, Building2, Home, Calendar, FileText,
+  ArrowLeft, Building2, Home, FileText,
   PenSquare, CheckCircle2, Clock, AlertCircle, Star,
   ThumbsUp, ThumbsDown, MessageSquare, RefreshCw
 } from 'lucide-react';
@@ -22,7 +22,9 @@ export default function RequestDetail() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const live = searchParams.get('live') === '1';
+  const focusRating = searchParams.get('rate') === '1';
   const { role } = useAuth();
+  const ratingRef = useRef<HTMLDivElement>(null);
 
   const [request, setRequest] = useState<MaintenanceRequest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -40,6 +42,11 @@ export default function RequestDetail() {
   }
 
   useEffect(() => { reload(); }, [id]);
+
+  useEffect(() => {
+    if (!focusRating || loading) return;
+    ratingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [focusRating, loading, request?.vendor_replied]);
 
   if (loading) {
     return (
@@ -70,7 +77,12 @@ export default function RequestDetail() {
   const isResolvable = isTenant && ['In Progress', 'Scheduled'].includes(request.status);
   const isResolved = request.status === 'Resolved';
   const hasVendor = !!pipeline?.assigned_vendor;
-  const hasRated = false; // optimistically managed below
+  const canRateTenant =
+    isTenant &&
+    Boolean(request.vendor_replied) &&
+    !isResolved &&
+    hasVendor &&
+    Boolean(pipeline?.assigned_vendor_id);
 
   return (
     <div className="max-w-3xl mx-auto space-y-5">
@@ -103,9 +115,6 @@ export default function RequestDetail() {
           {pipeline?.category && <InfoItem icon={<FileText size={14} />} label="Category" value={pipeline.category} />}
           {pipeline?.sla_target_hours != null && (
             <InfoItem icon={<Clock size={14} />} label="SLA" value={`${pipeline.sla_target_hours}h`} />
-          )}
-          {pipeline?.scheduled_time && (
-            <InfoItem icon={<Calendar size={14} />} label="Scheduled" value={new Date(pipeline.scheduled_time).toLocaleDateString()} />
           )}
           {pipeline?.assigned_vendor && (
             <InfoItem icon={<Building2 size={14} />} label="Vendor" value={pipeline.assigned_vendor} />
@@ -142,12 +151,29 @@ export default function RequestDetail() {
             </div>
           )}
 
-          {/* Vendor rating — show if resolved and vendor was assigned */}
-          {isResolved && hasVendor && pipeline?.assigned_vendor_id && (
-            <VendorRatingCard
-              vendorName={pipeline.assigned_vendor!}
-              vendorId={pipeline.assigned_vendor_id}
-            />
+          {canRateTenant && request.status === 'Scheduled' && (
+            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-5 py-4">
+              <Star size={18} className="text-amber-500 fill-amber-500 flex-shrink-0" />
+              <p className="text-sm text-amber-900">
+                Your vendor confirmed a visit
+                {pipeline?.scheduled_time
+                  ? ` for ${new Date(pipeline.scheduled_time).toLocaleString()}`
+                  : ''}
+                . Rate them below to close this ticket.
+              </p>
+            </div>
+          )}
+
+          {/* Vendor rating — show once the vendor has accepted and before the ticket is closed */}
+          {canRateTenant && (
+            <div ref={ratingRef}>
+              <VendorRatingCard
+                requestId={request.id}
+                vendorName={pipeline.assigned_vendor!}
+                vendorId={pipeline.assigned_vendor_id!}
+                onRated={reload}
+              />
+            </div>
           )}
 
         </div>
@@ -328,11 +354,15 @@ function TenantFeedbackCard({ requestId, onSubmitted }: { requestId: string; onS
 }
 
 function VendorRatingCard({
+  requestId,
   vendorName,
   vendorId,
+  onRated,
 }: {
+  requestId: string;
   vendorName: string;
   vendorId: string;
+  onRated: () => void;
 }) {
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
@@ -347,8 +377,9 @@ function VendorRatingCard({
     setError('');
     setSubmitting(true);
     try {
-      await rateVendor(vendorId, { rating, comment: comment || undefined });
+      await rateVendor(vendorId, { rating, comment: comment || undefined, request_id: requestId });
       setSubmitted(true);
+      onRated();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Rating failed.');
     } finally {
@@ -372,9 +403,9 @@ function VendorRatingCard({
     <div className="bg-white rounded-xl shadow-card border border-gray-100 p-5 space-y-4">
       <h2 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
         <Star size={15} className="text-amber-500" />
-        Rate your vendor
+        Rate Vendor & Close Ticket
       </h2>
-      <p className="text-xs text-gray-500">How was your experience with <strong>{vendorName}</strong>?</p>
+      <p className="text-xs text-gray-500">How was your experience with <strong>{vendorName}</strong>? Submit a rating to close this request.</p>
 
       <form onSubmit={handleSubmit} className="space-y-3">
         {/* Star picker */}

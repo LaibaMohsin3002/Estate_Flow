@@ -60,6 +60,17 @@ export function normalizePipeline(
 
 }
 
+function formatSpecialty(raw: unknown): string {
+  if (Array.isArray(raw)) {
+    const values = raw.map((item) => String(item).trim()).filter(Boolean);
+    return values.length ? values.join(', ') : 'General';
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    return raw;
+  }
+  return 'General';
+}
+
 export function mapMaintenanceRequest(row: Record<string, unknown>): MaintenanceRequest {
   return {
     id: String(row.id),
@@ -70,6 +81,7 @@ export function mapMaintenanceRequest(row: Record<string, unknown>): Maintenance
     original_issue: String(row.original_issue ?? ''),
     status: row.status as MaintenanceRequest['status'],
     created_at: String(row.created_at ?? ''),
+    vendor_replied: Boolean(row.vendor_replied),
     maintenance_pipeline_results: getPipelineFromRow(row),
     tenant_confirmed_resolved: row.tenant_confirmed_resolved as boolean | undefined,
     tenant_feedback: row.tenant_feedback as string | undefined,
@@ -95,7 +107,7 @@ export function mapVendor(row: Record<string, unknown>): Vendor {
   return {
     id: String(row.id),
     name: String(row.name ?? ''),
-    specialty: String(row.specialty ?? 'General'),
+    specialty: formatSpecialty(row.specialty),
     city: String(row.city ?? row.area ?? ''),
     rating: Number(row.rating ?? 5),
     assignments: Number(row.total_assignments ?? 0),

@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _BACKEND_DIR = Path(__file__).resolve().parent.parent
@@ -44,8 +45,26 @@ class Settings(BaseSettings):
     brave_api_key: str = ""
     enable_external_vendor_search: bool = False
 
+    google_client_id: str = Field(
+        default="",
+        validation_alias=AliasChoices("google_client_id", "GOOGLE_OAUTH_CLIENT_ID"),
+    )
+    google_client_secret: str = Field(
+        default="",
+        validation_alias=AliasChoices("google_client_secret", "GOOGLE_OAUTH_CLIENT_SECRET"),
+    )
+    google_redirect_uri: str = Field(
+        default="http://localhost:5173/calendar",
+        validation_alias=AliasChoices("google_redirect_uri", "GOOGLE_OAUTH_REDIRECT_URI"),
+    )
+    google_scopes: str = "https://www.googleapis.com/auth/calendar.events"
+    # Use Google Calendar remote MCP (calendarmcp.googleapis.com) when OAuth is connected
+    use_calendar_mcp: bool = True
+    calendar_mcp_url: str = "https://calendarmcp.googleapis.com/mcp/v1"
+
     # WhatsApp via TextMeBot
-    textmebot_api_key: str = ""
+    textmebot_api_key: str = ""   # legacy alias
+    textmebot_key: str = ""       # maps TEXTMEBOT_KEY from .env
     textmebot_sender_phone: str = ""
 
 

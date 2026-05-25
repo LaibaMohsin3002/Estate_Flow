@@ -11,6 +11,34 @@ def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * r * math.asin(math.sqrt(a))
 
 
+def _vendor_matches_specialty(vendor: dict[str, Any], specialty_norm: str) -> bool:
+    """
+    Check if a vendor matches the required specialty.
+    Handles both:
+    - text[] array (new schema): vendor.specialty == ['plumbing', 'general']
+    - plain string (legacy/seeded vendors): vendor.specialty == 'plumbing'
+    """
+    raw = vendor.get("specialty")
+    if not raw:
+        return False
+
+    if isinstance(raw, list):
+        return any(s.lower().strip() == specialty_norm for s in raw)
+
+    return str(raw).lower().strip() == specialty_norm
+
+
+def _vendor_is_available(vendor: dict[str, Any]) -> bool:
+    available = vendor.get("available")
+    if isinstance(available, bool):
+        return available
+    if isinstance(available, (int, float)):
+        return bool(available)
+    if isinstance(available, str):
+        return available.strip().lower() in {"1", "true", "yes", "y", "t"}
+    return True
+
+
 def rank_vendors(
     vendors: list[dict[str, Any]],
     specialty: str,
@@ -22,14 +50,16 @@ def rank_vendors(
     candidates: list[tuple[float, dict]] = []
 
     for vendor in vendors:
-        if not vendor.get("available", True):
+        if not _vendor_is_available(vendor):
             continue
-        if vendor.get("specialty", "").lower() != specialty_norm:
+        if not _vendor_matches_specialty(vendor, specialty_norm):
             continue
 
         score = float(vendor.get("rating") or 0)
-        distance = None
+        total_assignments = int(vendor.get("total_assignments") or 0)
+        score -= min(total_assignments * 0.2, 3.0)
 
+        distance = None
         if tenant_lat is not None and tenant_lon is not None:
             vlat, vlon = vendor.get("latitude"), vendor.get("longitude")
             if vlat is not None and vlon is not None:

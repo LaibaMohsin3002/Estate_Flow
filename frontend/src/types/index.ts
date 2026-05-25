@@ -1,4 +1,4 @@
-export type UserRole = 'tenant' | 'manager' | 'inspector' | 'admin';
+export type UserRole = 'tenant' | 'manager' | 'inspector' | 'admin' | 'vendor';
 
 export interface UserProfile {
   id: string;
@@ -6,6 +6,12 @@ export interface UserProfile {
   role: UserRole;
   full_name?: string;
   whatsapp_phone?: string;
+  phone?: string;
+  area?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+  specialties?: string[];
 }
 
 export interface AppNotification {
@@ -70,6 +76,7 @@ export interface MaintenanceRequest {
   original_issue: string;
   status: RequestStatus;
   created_at: string;
+  vendor_replied?: boolean;
   maintenance_pipeline_results?: PipelineResult;
   tenant_confirmed_resolved?: boolean;
   tenant_feedback?: string;

@@ -18,19 +18,12 @@ from app.agents.nodes import (
     security_agent,
     vendor_matching_agent,
 )
-from app.agents.state import MaintenanceGraphState
 from app.agents.progress import init_pipeline_progress
+from app.agents.state import MaintenanceGraphState
 from app.db import get_supabase_admin
 
 
 def build_maintenance_graph():
-    """
-    Production maintenance pipeline (real-time loop ends after communications_agent).
-
-    security → complaint → priority → compliance → vendor_matching
-      → governance_ethics → [human gate] → scheduling → communications
-      → report_agent → [manager sign] → performance_agent → END
-    """
     graph = StateGraph(MaintenanceGraphState)
 
     graph.add_node("security_agent", security_agent)
@@ -78,35 +71,8 @@ def build_maintenance_graph():
 
 
 async def schedule_verification_followup(state: MaintenanceGraphState) -> None:
-    """Node H (async): queue 24h tenant follow-up via notifications."""
-    admin = get_supabase_admin()
-    tenant_id = state.get("tenant_id")
-    if not tenant_id:
-        return
-
-    follow_up = state.get("follow_up_at")
-    msg = (
-        "Follow-up: Did the maintenance visit resolve your issue? "
-        "Reply in EstateFlow or contact your property manager."
-    )
-    admin.table("notifications").insert(
-        {
-            "type": "in_app",
-            "recipient_id": tenant_id,
-            "subject": "Maintenance follow-up",
-            "message": msg,
-            "reference_type": "maintenance_request",
-            "reference_id": state["request_id"],
-            "status": "pending",
-        }
-    ).execute()
-
-    try:
-        admin.table("maintenance_requests").update(
-            {"status": "In Progress"}
-        ).eq("id", state["request_id"]).execute()
-    except Exception:
-        pass
+    """Keep the pipeline free of in-app follow-up notifications. Future WhatsApp follow-ups can be added here."""
+    return
 
 
 async def persist_pipeline_result(state: MaintenanceGraphState, duration_ms: int) -> None:
@@ -177,8 +143,6 @@ async def persist_pipeline_result(state: MaintenanceGraphState, duration_ms: int
         "status": status,
     }
     admin.table("maintenance_requests").update(update_row).eq("id", request_id).execute()
-
-    # Agent steps are logged incrementally in persist_agent_step during graph run.
 
 
 async def run_maintenance_pipeline(initial: MaintenanceGraphState) -> dict[str, Any]:

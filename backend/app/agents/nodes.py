@@ -10,6 +10,7 @@ from app.db import get_supabase_admin
 from app.services.external_vendor_search import search_external_vendor
 from app.services.issue_parser import parse_urgency_fast
 from app.services.llm import structured_completion
+from app.services.phone import normalize_phone
 from app.services.notifications_helper import (
     notify_in_app,
     notify_managers_for_urgent,
@@ -380,7 +381,11 @@ async def vendor_matching_agent(state: MaintenanceGraphState) -> MaintenanceGrap
             license_valid = False
 
     assigned_name = selected["name"] if selected else None
-    assigned_phone = selected.get("phone") if selected else None
+    assigned_phone = None
+    if selected:
+        assigned_phone = normalize_phone(
+            selected.get("whatsapp_phone") or selected.get("phone")
+        ) or None
     assigned_id = selected.get("id") if selected else None
     distance = selected.get("distance_km") if selected else None
 
@@ -465,7 +470,7 @@ async def governance_ethics_agent(state: MaintenanceGraphState) -> MaintenanceGr
 
 
 async def scheduling_agent(state: MaintenanceGraphState) -> MaintenanceGraphState:
-    """Node F: Book internal calendar slot."""
+    """Node F: Assign vendor and update status. Calendar booking removed."""
     start = time.perf_counter()
 
     if state.get("requires_human_approval") and not state.get("human_approved"):
@@ -481,11 +486,6 @@ async def scheduling_agent(state: MaintenanceGraphState) -> MaintenanceGraphStat
             output,
             int((time.perf_counter() - start) * 1000),
         )
-
-    urgency = state.get("urgency", "Medium")
-    hours = 2 if urgency == "Critical" else 4 if urgency == "High" else 24
-    slot = datetime.utcnow() + timedelta(hours=hours)
-    scheduled = slot.strftime("%Y-%m-%d %H:%M UTC")
 
     if state.get("assigned_vendor_id"):
         admin = get_supabase_admin()
@@ -503,13 +503,13 @@ async def scheduling_agent(state: MaintenanceGraphState) -> MaintenanceGraphStat
             ).execute()
 
     ms = int((time.perf_counter() - start) * 1000)
-    output = {"scheduling_status": "Confirmed", "scheduled_time": scheduled}
+    output = {"scheduling_status": "Confirmed", "scheduled_time": None}
     return await _track(
         {
             **state,
             "scheduling_status": "Confirmed",
-            "scheduled_time": scheduled,
-            "db_status": "Scheduled",
+            "scheduled_time": None,
+            "db_status": "In Progress",
         },
         "scheduling_agent",
         output,
@@ -518,71 +518,31 @@ async def scheduling_agent(state: MaintenanceGraphState) -> MaintenanceGraphStat
 
 
 async def communications_agent(state: MaintenanceGraphState) -> MaintenanceGraphState:
-    """Node G: Tenant/manager messages (in_app; SMS/email ready via notifications table)."""
+    """Node G: WhatsApp vendor notification. In-app messages removed (replaced by WhatsApp)."""
     start = time.perf_counter()
-    tenant_id = state.get("tenant_id")
-    urgency = state.get("urgency", "Medium")
-    vendor = state.get("assigned_vendor") or "our maintenance team"
-    scheduled = state.get("scheduled_time") or "soon"
     summary = state.get("summary", "your issue")
+    vendor_name = state.get("assigned_vendor") or "Vendor"
+    ticket = state.get("request_id", "")[:8].upper()
+    whatsapp_sent = False
 
-    if state.get("requires_human_approval") and not state.get("human_approved"):
-        msg = (
-            f"Your request ({summary}) is classified as {urgency}. "
-            "A property manager must approve dispatch. You will be updated shortly."
-        )
-    elif state.get("scheduling_status") == "Confirmed":
-        msg = (
-            f"Hi — we've classified your issue as {urgency}: {summary}. "
-            f"{vendor} is scheduled for {scheduled}. Thank you for reporting via EstateFlow."
-        )
-    else:
-        msg = f"We received your request: {summary}. Status: {state.get('db_status', 'Open')}."
-
-    sent = False
-    if tenant_id:
-        await notify_in_app(
-            recipient_id=tenant_id,
-            message=msg,
-            subject="Maintenance update",
-            reference_type="maintenance_request",
-            reference_id=state["request_id"],
-        )
-        sent = True
-
-        # WhatsApp to tenant if they have a number stored
-        try:
-            admin = get_supabase_admin()
-            profile = (
-                admin.table("profiles")
-                .select("whatsapp_phone")
-                .eq("id", tenant_id)
-                .limit(1)
-                .execute()
-            )
-            tenant_wa = (profile.data or [{}])[0].get("whatsapp_phone") or ""
-            if tenant_wa:
-                await send_whatsapp(tenant_wa, msg)
-        except Exception:
-            pass  # WhatsApp failure must never block the pipeline
-
-    # WhatsApp to vendor when job is confirmed
+    # Send WhatsApp to matched vendor asking for 24-hour reply
     vendor_phone = state.get("vendor_phone") or ""
     if vendor_phone and state.get("scheduling_status") == "Confirmed":
         vendor_msg = (
-            f"New EstateFlow job assigned.\n"
+            f"Hi {vendor_name}, a new maintenance request has been matched with you on EstateFlow.\n"
             f"Issue: {summary}\n"
-            f"Scheduled: {scheduled}\n"
-            f"Ticket: {state.get('request_id', '')[:8].upper()}"
+            f"Ticket: TKT-{ticket}\n"
+            f"Please reply/confirm within 24 hours. Thank you!"
         )
         try:
-            await send_whatsapp(vendor_phone, vendor_msg)
+            ok = await send_whatsapp(vendor_phone, vendor_msg)
+            whatsapp_sent = ok
         except Exception:
-            pass
+            pass  # WhatsApp failure must never block the pipeline
 
     follow_up = schedule_follow_up_iso(24)
     ms = int((time.perf_counter() - start) * 1000)
-    output = {"tenant_message": msg, "notification_sent": sent, "follow_up_at": follow_up}
+    output = {"whatsapp_sent_to_vendor": whatsapp_sent, "follow_up_at": follow_up}
     return await _track(
         {**state, **output, "follow_up_at": follow_up},
         "communications_agent",

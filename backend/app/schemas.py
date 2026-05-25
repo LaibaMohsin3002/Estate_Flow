@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MaintenanceCreate(BaseModel):
@@ -20,17 +20,36 @@ class ProfileUpdate(BaseModel):
     whatsapp_phone: str | None = None
     property_id: str | None = None
     unit_id: str | None = None
+    area: str | None = None
+    city: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    specialties: list[str] | None = None
 
 
 class VendorRateBody(BaseModel):
     rating: int = Field(..., ge=1, le=5)
     comment: str | None = None
+    request_id: str | None = None
+
+
+class VendorReplyWebhookBody(BaseModel):
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
+
+    message: str = ""
+    from_: str = Field(..., alias="from")
+    ticket_id: str | None = None
+    request_id: str | None = None
+
+
+class CalendarConnectRequest(BaseModel):
+    code: str
+    calendar_id: str = "primary"
 
 
 class MaintenanceFeedback(BaseModel):
     confirmed_resolved: bool
     comment: str | None = None
-
 
 
 class InspectionCreate(BaseModel):

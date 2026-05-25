@@ -1,26 +1,15 @@
 """WhatsApp notification service via TextMeBot API."""
 import asyncio
 import logging
-from urllib.parse import quote
 
 import httpx
 
 from app.config import get_settings
+from app.services.phone import normalize_phone
 
 logger = logging.getLogger(__name__)
 
 TEXTMEBOT_URL = "https://api.textmebot.com/send.php"
-
-
-def _normalize_phone(phone: str) -> str:
-    """Normalize Pakistani phone numbers to international format (e.g. 03001234567 → 923001234567)."""
-    p = phone.strip().replace(" ", "").replace("-", "")
-    if p.startswith("+"):
-        p = p[1:]
-    if p.startswith("0") and len(p) == 11:
-        # Pakistani local format → international
-        p = "92" + p[1:]
-    return p
 
 
 async def send_whatsapp(
@@ -36,7 +25,7 @@ async def send_whatsapp(
 
     Args:
         phone: Recipient phone number (any common format, auto-normalized).
-        message: Plain text message (URL-encoded automatically).
+        message: Plain text message (encoded once by the HTTP client for the query string).
         doc_url: Optional PDF/document URL to attach.
         image_url: Optional image URL to attach.
         delay_seconds: Mandatory delay before sending (TextMeBot anti-ban). Default 5s.
@@ -45,11 +34,12 @@ async def send_whatsapp(
         True if the API call succeeded, False otherwise (never raises).
     """
     settings = get_settings()
-    if not settings.textmebot_api_key:
+    api_key = settings.textmebot_key or settings.textmebot_api_key
+    if not api_key:
         logger.debug("TextMeBot API key not configured — WhatsApp notification skipped.")
         return False
 
-    normalized = _normalize_phone(phone)
+    normalized = normalize_phone(phone)
     if not normalized:
         logger.warning("WhatsApp: invalid phone number '%s' — skipped.", phone)
         return False
@@ -59,8 +49,8 @@ async def send_whatsapp(
 
     params: dict[str, str] = {
         "recipient": normalized,
-        "apikey": settings.textmebot_api_key,
-        "text": quote(message, safe=""),
+        "apikey": api_key,
+        "text": message,
         "json": "yes",
     }
     if doc_url:
@@ -97,7 +87,6 @@ async def send_whatsapp_to_managers(
         admin.table("profiles")
         .select("whatsapp_phone")
         .in_("role", ["manager", "admin"])
-        .not_.is_("whatsapp_phone", "null")
         .execute()
     )
     sent = 0

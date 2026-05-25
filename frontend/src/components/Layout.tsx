@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { NavLink, useNavigate, Outlet } from 'react-router-dom';
+import { NavLink, useNavigate, Outlet, Navigate } from 'react-router-dom';
 import {
   LayoutDashboard, Plus, CheckSquare, Building2, Users2,
-  ClipboardList, LogOut, Menu, X, ChevronDown, Building, User
+  ClipboardList, LogOut, Menu, X, ChevronDown, Building, User, Loader2,
+  CalendarDays,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchPendingApprovals } from '../services/estateflow';
+import { fetchPendingApprovals, fetchMaintenanceRequests } from '../services/estateflow';
 import { NotificationBell } from './NotificationPanel';
 import { UserRole } from '../types';
 
@@ -14,17 +15,9 @@ interface NavItem {
   to: string;
   icon: React.ReactNode;
   roles: UserRole[];
+  badge?: number;
+  showWhen?: boolean;
 }
-
-const navItems: NavItem[] = [
-  { label: 'Dashboard', to: '/', icon: <LayoutDashboard size={18} />, roles: ['tenant', 'manager', 'inspector', 'admin'] },
-  { label: 'New Request', to: '/submit', icon: <Plus size={18} />, roles: ['tenant'] },
-  { label: 'Approvals', to: '/approvals', icon: <CheckSquare size={18} />, roles: ['manager', 'admin'] },
-  { label: 'Inspections', to: '/inspect', icon: <ClipboardList size={18} />, roles: ['manager', 'inspector', 'admin'] },
-  { label: 'Properties', to: '/properties', icon: <Building2 size={18} />, roles: ['tenant', 'manager', 'inspector', 'admin'] },
-  { label: 'Vendors', to: '/vendors', icon: <Users2 size={18} />, roles: ['manager', 'inspector', 'admin'] },
-  { label: 'Profile', to: '/profile', icon: <User size={18} />, roles: ['tenant', 'manager', 'inspector', 'admin'] },
-];
 
 export function Layout() {
   const { user, role, signOut } = useAuth();
@@ -32,6 +25,7 @@ export function Layout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [approvalCount, setApprovalCount] = useState(0);
+  const [hasOpenRequests, setHasOpenRequests] = useState(false);
 
   useEffect(() => {
     if (role !== 'manager' && role !== 'admin') return;
@@ -40,7 +34,43 @@ export function Layout() {
       .catch(() => setApprovalCount(0));
   }, [role]);
 
-  const visibleNav = navItems.filter(item => item.roles.includes(role));
+  useEffect(() => {
+    if (role !== 'tenant') return;
+    fetchMaintenanceRequests()
+      .then((reqs) => setHasOpenRequests(reqs.some((r) => ['Open', 'In Progress'].includes(r.status))))
+      .catch(() => setHasOpenRequests(false));
+  }, [role]);
+
+  // Vendor can only see profile and calendar
+  if (role === 'vendor') {
+    const path = window.location.pathname;
+    if (!['/profile', '/calendar'].includes(path)) {
+      return <Navigate to="/profile" replace />;
+    }
+  }
+
+  const navItems: NavItem[] = role === 'vendor'
+    ? [
+        { label: 'Profile', to: '/profile', icon: <User size={18} />, roles: ['vendor'] },
+        { label: 'Calendar', to: '/calendar', icon: <CalendarDays size={18} />, roles: ['vendor'] },
+      ]
+    : [
+        { label: 'Dashboard', to: '/', icon: <LayoutDashboard size={18} />, roles: ['tenant', 'manager', 'inspector', 'admin'] },
+        { label: 'New Request', to: '/submit', icon: <Plus size={18} />, roles: ['tenant'] },
+        { label: 'Under Process', to: '/under-process', icon: <Loader2 size={18} />, roles: ['tenant'], showWhen: hasOpenRequests },
+        { label: 'Approvals', to: '/approvals', icon: <CheckSquare size={18} />, roles: ['manager', 'admin'], badge: approvalCount },
+        { label: 'Inspections', to: '/inspect', icon: <ClipboardList size={18} />, roles: ['manager', 'inspector', 'admin'] },
+        { label: 'Properties', to: '/properties', icon: <Building2 size={18} />, roles: ['tenant', 'manager', 'inspector', 'admin'] },
+        { label: 'Vendors', to: '/vendors', icon: <Users2 size={18} />, roles: ['manager', 'inspector', 'admin'] },
+        { label: 'Calendar', to: '/calendar', icon: <CalendarDays size={18} />, roles: ['tenant', 'manager', 'inspector', 'admin', 'vendor'] },
+        { label: 'Profile', to: '/profile', icon: <User size={18} />, roles: ['tenant', 'manager', 'inspector', 'admin', 'vendor'] },
+      ];
+
+  const visibleNav = navItems.filter(item => {
+    if (!item.roles.includes(role)) return false;
+    if (item.showWhen !== undefined) return item.showWhen;
+    return true;
+  });
 
   async function handleSignOut() {
     await signOut();
@@ -70,6 +100,9 @@ export function Layout() {
               {approvalCount}
             </span>
           )}
+          {item.to === '/under-process' && (
+            <span className="ml-auto w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+          )}
         </NavLink>
       ))}
     </>
@@ -88,6 +121,7 @@ export function Layout() {
               <p className="text-white font-bold text-sm leading-tight">EstateFlow</p>
               <p className="text-teal-200 text-xs capitalize">{role}</p>
             </div>
+            {/* NotificationBell — kept active for general status alerts */}
             <NotificationBell />
           </div>
         </div>

@@ -13,6 +13,8 @@ import Properties from './pages/Properties';
 import Vendors from './pages/Vendors';
 import Inspections from './pages/Inspections';
 import Profile from './pages/Profile';
+import UnderProcess from './pages/UnderProcess';
+import Calendar from './pages/Calendar';
 
 
 export default function App() {
@@ -33,6 +35,11 @@ export default function App() {
                   <SubmitRequest />
                 </ProtectedRoute>
               } />
+              <Route path="under-process" element={
+                <ProtectedRoute allowedRoles={['tenant']}>
+                  <UnderProcess />
+                </ProtectedRoute>
+              } />
               <Route path="requests/:id" element={<RequestDetail />} />
               <Route path="approvals" element={
                 <ProtectedRoute allowedRoles={['manager', 'admin']}>
@@ -50,6 +57,7 @@ export default function App() {
                   <Vendors />
                 </ProtectedRoute>
               } />
+              <Route path="calendar" element={<Calendar />} />
               <Route path="profile" element={<Profile />} />
             </Route>
           </Route>

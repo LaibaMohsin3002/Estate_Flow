@@ -139,7 +139,7 @@ async def run_predictive_maintenance_batch() -> dict[str, Any]:
             try:
                 admin.table("notifications").insert(
                     {
-                        "type": "in_app",
+                        "type": "whatsapp",
                         "recipient_id": m["id"],
                         "subject": "Predictive maintenance alert",
                         "message": msg,

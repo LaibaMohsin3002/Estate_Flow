@@ -21,14 +21,37 @@ import {
   Vendor,
 } from '../types';
 
+function asString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function normalizeSpecialties(value: unknown): string[] | undefined {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item).trim()).filter(Boolean);
+  }
+  if (typeof value === 'string') {
+    return value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return undefined;
+}
+
 export async function fetchProfile(): Promise<UserProfile> {
   const row = unwrapData<Record<string, unknown>>(await api.get('/api/profile/me'));
   return {
     id: String(row.id),
-    email: String(row.email ?? ''),
+    email: asString(row.email ?? ''),
     role: row.role as UserProfile['role'],
     full_name: row.full_name as string | undefined,
+    phone: row.phone as string | undefined,
     whatsapp_phone: row.whatsapp_phone as string | undefined,
+    area: row.area as string | undefined,
+    city: row.city as string | undefined,
+    latitude: typeof row.latitude === 'number' ? row.latitude : undefined,
+    longitude: typeof row.longitude === 'number' ? row.longitude : undefined,
+    specialties: normalizeSpecialties(row.specialties ?? row.specialty),
   };
 }
 
@@ -36,14 +59,25 @@ export async function updateProfile(body: {
   full_name?: string;
   phone?: string;
   whatsapp_phone?: string;
+  area?: string;
+  city?: string;
+  latitude?: number;
+  longitude?: number;
+  specialties?: string[];
 }): Promise<UserProfile> {
   const row = unwrapData<Record<string, unknown>>(await api.put('/api/profile/me', body));
   return {
     id: String(row.id),
-    email: String(row.email ?? ''),
+    email: asString(row.email ?? ''),
     role: row.role as UserProfile['role'],
     full_name: row.full_name as string | undefined,
+    phone: row.phone as string | undefined,
     whatsapp_phone: row.whatsapp_phone as string | undefined,
+    area: row.area as string | undefined,
+    city: row.city as string | undefined,
+    latitude: typeof row.latitude === 'number' ? row.latitude : undefined,
+    longitude: typeof row.longitude === 'number' ? row.longitude : undefined,
+    specialties: normalizeSpecialties(row.specialties ?? row.specialty),
   };
 }
 
@@ -147,7 +181,7 @@ export async function fetchVendors(): Promise<Vendor[]> {
 
 export async function rateVendor(
   vendorId: string,
-  body: { rating: number; comment?: string }
+  body: { rating: number; comment?: string; request_id?: string }
 ): Promise<void> {
   await api.post(`/api/vendors/${vendorId}/rate`, body);
 }
@@ -198,4 +232,50 @@ export async function markAllNotificationsRead(): Promise<void> {
   await api.patch('/api/notifications/read-all', {});
 }
 
+export async function vendorReply(requestId: string): Promise<void> {
+  await api.post(`/api/vendors/requests/${requestId}/vendor-reply`, {});
+}
+
+export async function fetchCalendarStatus(): Promise<{
+  connected: boolean;
+  provider: string;
+  calendar_id: string;
+  connected_at?: string;
+}> {
+  const row = unwrapData<Record<string, unknown>>(await api.get('/api/calendar/status'));
+  return {
+    connected: Boolean(row.connected),
+    provider: String(row.provider ?? 'google'),
+    calendar_id: String(row.calendar_id ?? 'primary'),
+    connected_at: typeof row.connected_at === 'string' ? row.connected_at : undefined,
+  };
+}
+
+export async function getCalendarConnectUrl(): Promise<{ auth_url: string }> {
+  const row = unwrapData<Record<string, unknown>>(await api.get('/api/calendar/connect-url'));
+  return { auth_url: String(row.auth_url ?? '') };
+}
+
+export async function completeCalendarConnect(code: string): Promise<void> {
+  await api.post('/api/calendar/connect', { code, calendar_id: 'primary' });
+}
+
+export async function fetchVendorActiveJobs(): Promise<{
+  id: string;
+  ticket_id: string;
+  original_issue: string;
+  status: string;
+  vendor_replied: boolean;
+  created_at: string;
+}[]> {
+  const res = await api.get<{ data: unknown[] }>('/api/vendors/my-active-jobs');
+  return (res.data ?? []) as {
+    id: string;
+    ticket_id: string;
+    original_issue: string;
+    status: string;
+    vendor_replied: boolean;
+    created_at: string;
+  }[];
+}
 
