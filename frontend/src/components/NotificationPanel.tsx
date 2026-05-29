@@ -58,15 +58,13 @@ export function NotificationBell() {
 
   async function handleMarkAllRead() {
     await markAllNotificationsRead();
-    setNotifications((prev) => prev.map((n) => ({ ...n, read_at: new Date().toISOString() })));
+    setNotifications([]);
     setUnread(0);
   }
 
   async function handleMarkRead(id: string) {
     await markNotificationRead(id);
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n))
-    );
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
     setUnread((u) => Math.max(0, u - 1));
   }
 
@@ -89,7 +87,7 @@ export function NotificationBell() {
 
       {/* Slide-out panel */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
+        <div className="fixed right-4 left-4 top-16 sm:left-auto sm:w-96 lg:left-64 lg:right-auto bg-white rounded-xl shadow-2xl border border-gray-100 z-50 overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
             <div className="flex items-center gap-2">
@@ -129,7 +127,7 @@ export function NotificationBell() {
             ) : notifications.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-10 text-center px-4">
                 <Bell size={24} className="text-gray-200" />
-                <p className="text-sm text-gray-400">No notifications yet</p>
+                <p className="text-sm text-gray-400">No unread notifications</p>
               </div>
             ) : (
               notifications.map((n) => {

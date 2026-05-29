@@ -26,6 +26,33 @@ export interface AppNotification {
   created_at: string;
 }
 
+export interface ChatSource {
+  source_type?: string;
+  source_id?: string;
+  title: string;
+  snippet: string;
+  similarity?: number;
+}
+
+export interface ChatResponse {
+  answer: string;
+  sources: ChatSource[];
+  tokens?: number;
+  rag_hit_count?: number;
+  llm_source?: string;
+}
+
+export interface VendorReview {
+  id: string;
+  request_id: string;
+  ticket_id?: string;
+  property_name?: string;
+  unit?: string;
+  rating: number;
+  comment?: string;
+  created_at: string;
+}
+
 export type RequestStatus =
   | 'Open'
   | 'In Progress'

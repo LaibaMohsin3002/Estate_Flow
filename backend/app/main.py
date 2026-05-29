@@ -26,6 +26,7 @@ from app.api.routes import (
     calendar,
     health,
     inspections,
+    knowledge,
     maintenance,
     notifications,
     predictive,
@@ -63,6 +64,7 @@ app.include_router(maintenance.router, prefix="/api")
 app.include_router(inspections.router, prefix="/api")
 app.include_router(predictive.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
+app.include_router(knowledge.router, prefix="/api")
 
 
 async def _vendor_followup_loop() -> None:

@@ -1,11 +1,14 @@
 import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.services.llm import structured_completion
 
-KARACHI = ZoneInfo("Asia/Karachi")
+try:
+    KARACHI = ZoneInfo("Asia/Karachi")
+except ZoneInfoNotFoundError:
+    KARACHI = timezone(timedelta(hours=5), "Asia/Karachi")
 WEEKDAYS = {
     "monday": 0,
     "tuesday": 1,

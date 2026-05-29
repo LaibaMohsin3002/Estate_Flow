@@ -1,13 +1,22 @@
+from __future__ import annotations
+
 import json
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from google.auth.exceptions import RefreshError
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import Flow
+try:
+    from google.auth.exceptions import RefreshError
+    from google.auth.transport.requests import Request
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+    from google_auth_oauthlib.flow import Flow
+except ImportError:
+    RefreshError = RuntimeError  # type: ignore[assignment]
+    Request = None  # type: ignore[assignment]
+    Credentials = None  # type: ignore[assignment]
+    build = None  # type: ignore[assignment]
+    Flow = None  # type: ignore[assignment]
 
 from app.config import get_settings
 from app.db import get_supabase_admin
@@ -41,6 +50,8 @@ def _build_flow() -> Flow:
     settings = _settings()
     if not settings.google_client_id or not settings.google_client_secret or not settings.google_redirect_uri:
         raise RuntimeError("Google Calendar OAuth is not configured")
+    if Flow is None:
+        raise RuntimeError("Google Calendar dependencies are not installed")
     flow = Flow.from_client_config(_client_config(), scopes=_scopes())
     flow.redirect_uri = settings.google_redirect_uri
     return flow
@@ -96,6 +107,9 @@ def _normalize_credentials_expiry(credentials: Credentials) -> None:
 
 def _credentials_from_row(row: dict[str, Any]) -> Credentials | None:
     if not row.get("access_token_enc"):
+        return None
+    if Credentials is None:
+        logger.warning("Google Calendar dependencies are not installed")
         return None
     settings = _settings()
     expiry = _parse_expiry(row.get("token_expiry"))
@@ -209,6 +223,10 @@ def refresh_calendar_credentials(profile_id: str) -> Credentials | None:
         clear_calendar_connection(profile_id)
         return None
 
+    if Request is None:
+        logger.warning("Google Calendar dependencies are not installed")
+        return None
+
     try:
         credentials.refresh(Request())
         _normalize_credentials_expiry(credentials)
@@ -248,6 +266,8 @@ def save_calendar_connection(profile_id: str, calendar_id: str, token_payload: d
     settings = _settings()
     if not settings.google_client_id or not settings.google_client_secret or not settings.google_redirect_uri:
         raise RuntimeError("Google Calendar OAuth is not configured")
+    if Credentials is None:
+        raise RuntimeError("Google Calendar dependencies are not installed")
 
     credentials = Credentials(
         token=token_payload.get("access_token"),
@@ -274,6 +294,9 @@ def _create_calendar_event_rest(
     """Create via Calendar REST API. Returns Google event id on success."""
     owner_id = _connection_owner_profile_id(connection)
     if not owner_id:
+        return None
+    if build is None:
+        logger.warning("Google Calendar dependencies are not installed")
         return None
 
     credentials = refresh_calendar_credentials(owner_id)

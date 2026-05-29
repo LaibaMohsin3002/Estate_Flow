@@ -91,7 +91,7 @@ BEGIN
       v_name,
       v_phone,
       NEW.email,
-      0,
+      TRUE,
       5.0,
       v_specialties,
       0,

@@ -500,6 +500,42 @@ async def vendor_active_jobs(user: dict = Depends(get_current_user)):
     return {"data": reqs.data or []}
 
 
+@router.get("/my-reviews")
+async def vendor_reviews(user: dict = Depends(require_roles("vendor"))):
+    admin = get_supabase_admin()
+    ratings = (
+        admin.table("vendor_ratings")
+        .select("id, request_id, rating, comment, created_at")
+        .eq("vendor_id", user["id"])
+        .order("created_at", desc=True)
+        .limit(25)
+        .execute()
+    )
+    rows = ratings.data or []
+    request_ids = [r["request_id"] for r in rows if r.get("request_id")]
+    requests_by_id: dict[str, dict] = {}
+    if request_ids:
+        reqs = (
+            admin.table("maintenance_requests")
+            .select("id, ticket_id, property_name, unit")
+            .in_("id", request_ids)
+            .execute()
+        )
+        requests_by_id = {r["id"]: r for r in (reqs.data or [])}
+
+    return {
+        "data": [
+            {
+                **row,
+                "ticket_id": requests_by_id.get(row.get("request_id"), {}).get("ticket_id"),
+                "property_name": requests_by_id.get(row.get("request_id"), {}).get("property_name"),
+                "unit": requests_by_id.get(row.get("request_id"), {}).get("unit"),
+            }
+            for row in rows
+        ]
+    }
+
+
 @router.post("/{vendor_id}/rate")
 async def rate_vendor(
     vendor_id: str,

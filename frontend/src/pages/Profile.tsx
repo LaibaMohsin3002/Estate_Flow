@@ -9,10 +9,17 @@ import {
   CheckCircle2,
   AlertCircle,
   Building2,
+  Star,
 } from 'lucide-react';
-import { fetchProfile, updateProfile, fetchVendorActiveJobs, vendorReply } from '../services/estateflow';
+import {
+  fetchProfile,
+  updateProfile,
+  fetchVendorActiveJobs,
+  fetchVendorReviews,
+  vendorReply,
+} from '../services/estateflow';
 import { useAuth } from '../contexts/AuthContext';
-import { UserProfile } from '../types';
+import { UserProfile, VendorReview } from '../types';
 
 const VENDOR_SPECIALTIES = ['Plumbing', 'Electrical', 'HVAC', 'Painting', 'Carpentry', 'Cleaning', 'General'];
 
@@ -22,12 +29,14 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [jobsLoading, setJobsLoading] = useState(false);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   const [replyingId, setReplyingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [activeJobs, setActiveJobs] = useState<
     { id: string; ticket_id: string; original_issue: string; status: string; vendor_replied: boolean; created_at: string }[]
   >([]);
+  const [reviews, setReviews] = useState<VendorReview[]>([]);
   const [form, setForm] = useState({
     full_name: '',
     phone: '',
@@ -73,12 +82,25 @@ export default function Profile() {
     }
   }
 
+  async function loadReviews() {
+    if (role !== 'vendor') return;
+    setReviewsLoading(true);
+    try {
+      setReviews(await fetchVendorReviews());
+    } catch {
+      setReviews([]);
+    } finally {
+      setReviewsLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadProfile();
   }, []);
 
   useEffect(() => {
     loadJobs();
+    loadReviews();
   }, [role]);
 
   async function handleSave(e: React.FormEvent<HTMLFormElement>) {
@@ -382,6 +404,66 @@ export default function Profile() {
                     {replyingId === job.id ? <Loader2 size={14} className="animate-spin" /> : <Building2 size={14} />}
                     {job.vendor_replied ? 'Confirmed' : 'Send reminder'}
                   </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {isVendor && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Reviews</p>
+              <p className="text-xs text-gray-500">Tenant feedback from completed jobs.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => loadReviews()}
+              className="text-sm text-teal-700 font-medium"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {reviewsLoading ? (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <Loader2 size={14} className="animate-spin" />
+              Loading reviews...
+            </div>
+          ) : reviews.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-200 px-4 py-5 text-sm text-gray-500">
+              No reviews yet.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {reviews.map((review) => (
+                <div key={review.id} className="border border-gray-100 rounded-xl p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-mono text-gray-400">
+                        {review.ticket_id || review.request_id.slice(0, 8)}
+                      </p>
+                      <p className="text-sm font-medium text-gray-900 mt-1">
+                        {[review.property_name, review.unit ? `Unit ${review.unit}` : '']
+                          .filter(Boolean)
+                          .join(' · ') || 'Maintenance job'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-0.5 text-amber-500">
+                      {Array.from({ length: 5 }, (_, i) => (
+                        <Star
+                          key={i}
+                          size={14}
+                          className={i < review.rating ? 'fill-amber-400' : 'text-gray-200'}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  {review.comment && (
+                    <p className="mt-3 text-sm text-gray-600 leading-relaxed">{review.comment}</p>
+                  )}
                 </div>
               ))}
             </div>

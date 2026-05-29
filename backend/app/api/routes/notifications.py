@@ -1,5 +1,5 @@
-"""Notifications API routes — tenant inbox, mark-as-read."""
-from fastapi import APIRouter, Depends
+"""Notifications API routes — focused unread inbox, mark-as-read."""
+from fastapi import APIRouter, Depends, Query
 
 from app.auth import get_current_user
 from app.db import get_supabase_admin
@@ -8,20 +8,37 @@ router = APIRouter(prefix="/notifications", tags=["notifications"])
 
 
 @router.get("")
-async def list_notifications(user: dict = Depends(get_current_user)):
-    """Return all notifications for the current user, newest first."""
+async def list_notifications(
+    include_read: bool = Query(False),
+    limit: int = Query(12, ge=1, le=30),
+    user: dict = Depends(get_current_user),
+):
+    """Return the current user's most relevant notifications, newest first."""
     admin = get_supabase_admin()
-    result = (
+    unread_result = (
+        admin.table("notifications")
+        .select("id", count="exact")
+        .eq("recipient_id", user["id"])
+        .eq("type", "in_app")
+        .in_("status", ["sent", "pending"])
+        .is_("read_at", "null")
+        .execute()
+    )
+    query = (
         admin.table("notifications")
         .select("*")
         .eq("recipient_id", user["id"])
+        .eq("type", "in_app")
+        .in_("status", ["sent", "pending"])
         .order("created_at", desc=True)
-        .limit(50)
-        .execute()
+        .limit(limit)
     )
+    if not include_read:
+        query = query.is_("read_at", "null")
+
+    result = query.execute()
     rows = result.data or []
-    unread = sum(1 for r in rows if not r.get("read_at"))
-    return {"data": rows, "unread_count": unread}
+    return {"data": rows, "unread_count": unread_result.count or 0}
 
 
 @router.patch("/{notification_id}/read")

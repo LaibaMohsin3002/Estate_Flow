@@ -2,10 +2,20 @@
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
-if (-not (Test-Path ".\.venv\Scripts\python.exe")) {
-    python -m venv .venv
-    .\.venv\Scripts\pip install -r requirements.txt
+$PythonPath = ".\venv\Scripts\python.exe"
+$PipPath = ".\venv\Scripts\pip.exe"
+
+if (-not (Test-Path $PythonPath)) {
+    $PythonPath = ".\.venv\Scripts\python.exe"
+    $PipPath = ".\.venv\Scripts\pip.exe"
 }
 
-Write-Host "Using: $((Resolve-Path .\.venv\Scripts\python.exe).Path)" -ForegroundColor Green
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
+if (-not (Test-Path $PythonPath)) {
+    python -m venv .venv
+    $PythonPath = ".\.venv\Scripts\python.exe"
+    $PipPath = ".\.venv\Scripts\pip.exe"
+    & $PipPath install -r requirements.txt
+}
+
+Write-Host "Using: $((Resolve-Path $PythonPath).Path)" -ForegroundColor Green
+& $PythonPath -m uvicorn app.main:app --reload --port 8000

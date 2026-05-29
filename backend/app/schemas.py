@@ -89,3 +89,14 @@ class VendorCreate(BaseModel):
     longitude: float | None = None
     city: str | None = None
     area: str | None = None
+
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
+    property_id: str | None = None
+    history: list[ChatMessage] = Field(default_factory=list)

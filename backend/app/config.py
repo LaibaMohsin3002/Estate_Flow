@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     llm_timeout_seconds: int = 30
     # Priority uses risk matrix + rules by default (fast). Set true to add a second LLM call.
     priority_use_llm: bool = False
+    rag_enabled: bool = True
+    embedding_model: str = "openai/text-embedding-3-small"
+    embedding_fallback_models: str = ""
+    rag_top_k: int = 5
+    rag_chat_top_k: int = 5
+    rag_min_similarity: float = 0.25
 
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:7b"

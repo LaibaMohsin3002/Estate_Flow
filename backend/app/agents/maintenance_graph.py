@@ -21,6 +21,7 @@ from app.agents.nodes import (
 from app.agents.progress import init_pipeline_progress
 from app.agents.state import MaintenanceGraphState
 from app.db import get_supabase_admin
+from app.services.rag.indexer import index_maintenance_ticket
 
 
 def build_maintenance_graph():
@@ -143,6 +144,32 @@ async def persist_pipeline_result(state: MaintenanceGraphState, duration_ms: int
         "status": status,
     }
     admin.table("maintenance_requests").update(update_row).eq("id", request_id).execute()
+
+    request = (
+        admin.table("maintenance_requests")
+        .select("id, ticket_id, property_id, property_name, unit, tenant_id, original_issue, redacted_issue, status")
+        .eq("id", request_id)
+        .limit(1)
+        .execute()
+    )
+    row = (request.data or [None])[0]
+    if row:
+        try:
+            await index_maintenance_ticket(
+                request_id=request_id,
+                property_id=str(row["property_id"]) if row.get("property_id") else None,
+                tenant_id=str(row["tenant_id"]) if row.get("tenant_id") else None,
+                ticket_id=row.get("ticket_id") or request_id[:8],
+                summary=state.get("summary") or "",
+                issue=row.get("redacted_issue") or row.get("original_issue") or "",
+                category=state.get("category"),
+                urgency=state.get("urgency"),
+                status=status,
+                property_name=row.get("property_name"),
+                unit=row.get("unit"),
+            )
+        except Exception:
+            pass
 
 
 async def run_maintenance_pipeline(initial: MaintenanceGraphState) -> dict[str, Any]:

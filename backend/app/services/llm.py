@@ -5,7 +5,7 @@ import re
 from typing import Any
 
 import httpx
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 
 from app.config import get_settings
@@ -153,3 +153,27 @@ async def structured_completion(
         "confidence": 0.5,
         "source": "minimal_fallback",
     }
+
+
+async def chat_completion(messages: list[BaseMessage]) -> tuple[str, int, str]:
+    """Plain chat completion used by RAG. Returns an empty answer on provider failure."""
+    settings = get_settings()
+
+    async def _call_llm() -> tuple[str, int]:
+        llm = _build_client()
+        response = await llm.ainvoke(messages)
+        content = response.content
+        if isinstance(content, list):
+            content = "".join(str(c) for c in content)
+        text = str(content).strip()
+        system = "\n".join(str(m.content) for m in messages if isinstance(m, SystemMessage))
+        user = "\n".join(str(m.content) for m in messages if isinstance(m, HumanMessage))
+        tokens = _tokens_from_response(response, system, user, text)
+        return text, tokens
+
+    try:
+        answer, tokens = await asyncio.wait_for(_call_llm(), timeout=settings.llm_timeout_seconds)
+        return answer, tokens, "openrouter"
+    except Exception as exc:
+        logger.warning("Chat completion failed; RAG will use local synthesis: %s", exc)
+        return "", 0, "fallback"

@@ -17,6 +17,7 @@ import { UrgencyBadge } from '../components/UrgencyBadge';
 import { StatCard } from '../components/StatCard';
 import { TableSkeleton, CardSkeleton } from '../components/LoadingSkeleton';
 import { EmptyState } from '../components/EmptyState';
+import { RagChatPanel } from '../components/RagChatPanel';
 
 export default function Dashboard() {
   const { role, user } = useAuth();
@@ -61,6 +62,8 @@ function TenantDashboard({ userId }: { userId?: string }) {
         <StatCard label="In Progress" value={inProgress} icon={<ClipboardList size={18} />} color="teal" />
         <StatCard label="Resolved" value={resolved} icon={<CheckCircle2 size={18} />} color="green" />
       </div>
+
+      <RagChatPanel mode="tenant" />
 
       <div className="bg-white rounded-xl shadow-card border border-gray-100 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100">
@@ -167,6 +170,7 @@ function ManagerDashboard() {
         <StatCard label="Resolved" value={resolved} icon={<CheckCircle2 size={18} />} color="green" />
       </div>
 
+      <div className="grid xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)] gap-4 items-start">
       {/* Predictive maintenance */}
       <div className="bg-white rounded-xl shadow-card border border-gray-100 overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
@@ -218,6 +222,8 @@ function ManagerDashboard() {
             ))}
           </div>
         )}
+      </div>
+      <RagChatPanel mode="manager" />
       </div>
 
       {/* Requests table */}

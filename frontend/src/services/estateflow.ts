@@ -12,6 +12,7 @@ import {
 import {
   AgentLog,
   AppNotification,
+  ChatResponse,
   Inspection,
   MaintenanceRequest,
   PipelineResult,
@@ -19,6 +20,7 @@ import {
   Property,
   UserProfile,
   Vendor,
+  VendorReview,
 } from '../types';
 
 function asString(value: unknown): string {
@@ -212,6 +214,21 @@ export async function runPredictiveMaintenance(): Promise<void> {
   await api.post('/api/predictive-maintenance/run');
 }
 
+export async function chatManager(body: {
+  message: string;
+  property_id?: string;
+  history?: { role: 'user' | 'assistant'; content: string }[];
+}): Promise<ChatResponse> {
+  return unwrapData<ChatResponse>(await api.post('/api/knowledge/chat/manager', body));
+}
+
+export async function chatTenant(body: {
+  message: string;
+  history?: { role: 'user' | 'assistant'; content: string }[];
+}): Promise<ChatResponse> {
+  return unwrapData<ChatResponse>(await api.post('/api/knowledge/chat/tenant', body));
+}
+
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 export async function fetchNotifications(): Promise<{
@@ -277,5 +294,19 @@ export async function fetchVendorActiveJobs(): Promise<{
     vendor_replied: boolean;
     created_at: string;
   }[];
+}
+
+export async function fetchVendorReviews(): Promise<VendorReview[]> {
+  const rows = unwrapData<Record<string, unknown>[]>(await api.get('/api/vendors/my-reviews'));
+  return (rows ?? []).map((row) => ({
+    id: String(row.id),
+    request_id: String(row.request_id),
+    ticket_id: row.ticket_id as string | undefined,
+    property_name: row.property_name as string | undefined,
+    unit: row.unit as string | undefined,
+    rating: Number(row.rating ?? 0),
+    comment: row.comment as string | undefined,
+    created_at: String(row.created_at ?? ''),
+  }));
 }
 
